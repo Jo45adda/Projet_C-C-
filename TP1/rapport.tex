@@ -1,0 +1,313 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{booktabs}
+\usepackage{hyperref}
+
+\renewcommand{\algorithmicrequire}{\textbf{Entrées :}}
+\renewcommand{\algorithmicensure}{\textbf{Sortie :}}
+\floatname{algorithm}{Algorithme}
+
+% --- Listings (accents tolérés dans les commentaires) ---
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{blue!70!black},
+  commentstyle=\color{green!40!black}\itshape,
+  stringstyle=\color{red!60!black},
+  numbers=left, numberstyle=\tiny, numbersep=6pt,
+  breaklines=true, frame=single, showstringspaces=false,
+  tabsize=4, inputencoding=utf8, extendedchars=true,
+  literate={é}{{\'e}}1 {è}{{\`e}}1 {ê}{{\^e}}1 {à}{{\`a}}1 {â}{{\^a}}1
+           {ù}{{\`u}}1 {û}{{\^u}}1 {ô}{{\^o}}1 {î}{{\^i}}1 {ç}{{\c c}}1
+           {É}{{\'E}}1 {È}{{\`E}}1
+}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\T}{\mathsf{T}}
+
+\title{\textbf{TP1 -- Méthodes directes : matrices tridiagonales symétriques}\\[2pt]
+\large M2-CS, MA0922 -- Calcul Scientifique (C/C++)}
+\author{ADDA Josaphat}
+\date{Université de Reims Champagne-Ardenne}
+
+\begin{document}
+\maketitle
+
+\noindent\textbf{Organisation des fichiers.}
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+Exercice 1 & \texttt{exercice1/ex1\_cholesky\_tridiag.py} (Python)\\
+Exercice 2 & \texttt{exercice2/ex2\_structures.c} (C)\\
+Exercice 3 (question 1) & \texttt{exercice3/ex3\_solveur.c} (C, un seul fichier)\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% =====================================================================
+\section{Exercice 1 : $A=CC^\T$ pour les matrices tridiagonales}
+% =====================================================================
+
+Soit $A\in\R^{n\times n}$ symétrique, définie positive (SDP), tridiagonale, et
+$C$ triangulaire inférieure \emph{bidiagonale} :
+\[
+A=\begin{pmatrix}
+a_{11}&a_{21}&&\\
+a_{21}&a_{22}&\ddots&\\
+&\ddots&\ddots&a_{n,n-1}\\
+&&a_{n,n-1}&a_{nn}
+\end{pmatrix},\qquad
+C=\begin{pmatrix}
+c_{11}&&&\\
+c_{21}&c_{22}&&\\
+&\ddots&\ddots&\\
+&&c_{n,n-1}&c_{nn}
+\end{pmatrix}.
+\]
+
+\textbf{Modèle de coût.} On compte le nombre d'opérations arithmétiques
+élémentaires : addition/soustraction (+,$-$), multiplication ($\times$),
+division ($/$) et racine carrée ($\sqrt{\ }$), chacune comptée pour $1$.
+On note aussi le détail par type d'opération.
+
+% ---------------------------------------------------------------------
+\subsection{Question 1 : formules de calcul des coefficients de $C$}
+% ---------------------------------------------------------------------
+
+Le coefficient $(i,j)$ de $CC^\T$ vaut $\displaystyle (CC^\T)_{ij}=\sum_{k=1}^{n}c_{ik}\,c_{jk}$.
+Comme $c_{ik}\neq0$ seulement pour $k\in\{i-1,i\}$, on a :
+\begin{itemize}
+\item pour $|i-j|\ge2$ : les ensembles $\{i-1,i\}$ et $\{j-1,j\}$ sont disjoints,
+donc $(CC^\T)_{ij}=0=a_{ij}$ : \emph{la structure tridiagonale est automatiquement respectée} ;
+\item pour $j=i-1$ : seul $k=i-1$ est commun, d'où $a_{i,i-1}=c_{i,i-1}\,c_{i-1,i-1}$ ;
+\item pour $j=i$ : $a_{ii}=c_{i,i-1}^2+c_{ii}^2$ (avec $c_{1,0}:=0$).
+\end{itemize}
+En identifiant $A=CC^\T$ et en résolvant dans l'ordre $i=1,2,\dots,n$ :
+\[
+\boxed{\;c_{11}=\sqrt{a_{11}},\qquad
+c_{i,i-1}=\frac{a_{i,i-1}}{c_{i-1,i-1}},\qquad
+c_{ii}=\sqrt{a_{ii}-c_{i,i-1}^2},\qquad i=2,\dots,n.\;}
+\]
+Chaque coefficient ne dépend que de coefficients déjà calculés, ce qui justifie l'ordre.
+Comme $A$ est SDP, les quantités sous les racines sont strictement positives
+(sinon l'algorithme s'arrête : $A$ n'est pas SDP).
+
+\begin{algorithm}[h]
+\caption{Cholesky tridiagonal $A=CC^\T$}
+\begin{algorithmic}[1]
+\Require $a_{11},\dots,a_{nn}$ et $a_{21},\dots,a_{n,n-1}$
+\Ensure $c_{11},\dots,c_{nn}$ et $c_{21},\dots,c_{n,n-1}$
+\State $c_{11}\gets\sqrt{a_{11}}$
+\For{$i=2$ \textbf{à} $n$}
+  \State $c_{i,i-1}\gets a_{i,i-1}/c_{i-1,i-1}$
+  \State $c_{ii}\gets\sqrt{a_{ii}-c_{i,i-1}^2}$
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+\paragraph{Complexité (calcul exact).}
+\begin{itemize}
+\item Ligne 1 : $1$ racine carrée.
+\item Une itération de la boucle ($i\ge2$) coûte :
+ \begin{itemize}
+ \item ligne 3 : $1$ division ;
+ \item ligne 4 : $c_{i,i-1}^2$ est $1$ multiplication, la soustraction $a_{ii}-c_{i,i-1}^2$ est $1$ soustraction,
+ puis $1$ racine carrée.
+ \end{itemize}
+ soit $1+1+1+1=4$ opérations.
+\item La boucle comporte $n-1$ itérations ($i=2,\dots,n$).
+\end{itemize}
+Donc
+\[
+T_{\mathrm{fact}}(n)=1+\sum_{i=2}^{n}4=1+4(n-1)=\boxed{4n-3}\ \text{opérations},
+\]
+détail : $n$ racines, $(n-1)$ divisions, $(n-1)$ multiplications, $(n-1)$ soustractions.
+La complexité est donc $\Theta(n)$ ; en particulier, hors racines, on a $3(n-1)$ opérations flottantes.
+À titre de comparaison, Cholesky d'une matrice pleine coûte $\frac{n^3}{3}+O(n^2)$ :
+on gagne un facteur d'ordre $n^2$ grâce à la structure.
+
+\paragraph{Mémoire.} $A$ et $C$ ne nécessitent que $2n-1$ réels chacune
+(diagonale + une sous-diagonale), contre $n^2$ pour une matrice pleine.
+
+\paragraph{Cas de la matrice de test.} Pour $A=\mathrm{tridiag}(-1,2,-1)$, on démontre par récurrence que
+$c_{ii}^2=\frac{i+1}{i}$ et $c_{i+1,i}=-1/c_{ii}$ :
+$c_{11}^2=2$ ; si $c_{i-1,i-1}^2=\frac{i}{i-1}$, alors $c_{i,i-1}^2=\frac{1}{c_{i-1,i-1}^2}=\frac{i-1}{i}$ et
+$c_{ii}^2=2-\frac{i-1}{i}=\frac{i+1}{i}$. Tous ces termes sont $>0$, donc $A$ est bien SDP.
+
+% ---------------------------------------------------------------------
+\subsection{Question 2 : descente et remontée}
+% ---------------------------------------------------------------------
+
+\paragraph{Descente $Cy=b$.} $C$ étant bidiagonale inférieure, la ligne $i$ de $Cy=b$ s'écrit
+$c_{i,i-1}y_{i-1}+c_{ii}y_i=b_i$, d'où
+\[
+\boxed{\;y_1=\frac{b_1}{c_{11}},\qquad y_i=\frac{b_i-c_{i,i-1}\,y_{i-1}}{c_{ii}},\quad i=2,\dots,n.\;}
+\]
+
+\begin{algorithm}[h]
+\caption{Descente $Cy=b$}
+\begin{algorithmic}[1]
+\State $y_1\gets b_1/c_{11}$
+\For{$i=2$ \textbf{à} $n$}
+  \State $y_i\gets (b_i-c_{i,i-1}\,y_{i-1})/c_{ii}$
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+\emph{Complexité.} Ligne 1 : $1$ division. Chaque itération : $1$ multiplication, $1$ soustraction, $1$ division, soit $3$ opérations,
+répétées $n-1$ fois :
+\[
+T_{\mathrm{desc}}(n)=1+3(n-1)=\boxed{3n-2}.
+\]
+
+\paragraph{Remontée $C^\T x=y$.} $C^\T$ est bidiagonale \emph{supérieure} :
+$(C^\T)_{ii}=c_{ii}$ et $(C^\T)_{i,i+1}=c_{i+1,i}$. La ligne $i$ s'écrit
+$c_{ii}x_i+c_{i+1,i}x_{i+1}=y_i$ ($i<n$), et la dernière $c_{nn}x_n=y_n$ :
+\[
+\boxed{\;x_n=\frac{y_n}{c_{nn}},\qquad x_i=\frac{y_i-c_{i+1,i}\,x_{i+1}}{c_{ii}},\quad i=n-1,\dots,1.\;}
+\]
+
+\begin{algorithm}[h]
+\caption{Remontée $C^\T x=y$}
+\begin{algorithmic}[1]
+\State $x_n\gets y_n/c_{nn}$
+\For{$i=n-1$ \textbf{à} $1$ \textbf{par pas de} $-1$}
+  \State $x_i\gets (y_i-c_{i+1,i}\,x_{i+1})/c_{ii}$
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+\emph{Complexité.} Même décompte : $1$ division, puis $n-1$ itérations de $3$ opérations :
+\[
+T_{\mathrm{rem}}(n)=1+3(n-1)=\boxed{3n-2}.
+\]
+
+% ---------------------------------------------------------------------
+\subsection{Question 3 : solveur complet}
+% ---------------------------------------------------------------------
+
+Puisque $A=CC^\T$, résoudre $Ax=b$ équivaut à $C(C^\T x)=b$, soit
+\[
+Cy=b\quad(\text{descente}),\qquad C^\T x=y\quad(\text{remontée}).
+\]
+
+\begin{algorithm}[h]
+\caption{\texttt{solveur\_chol\_tridiag(A,b)}}
+\begin{algorithmic}[1]
+\State Calculer $C$ tel que $A=CC^\T$ \Comment{Algorithme 1}
+\State Résoudre $Cy=b$ \Comment{Algorithme 2}
+\State Résoudre $C^\T x=y$ \Comment{Algorithme 3}
+\State \Return $x$
+\end{algorithmic}
+\end{algorithm}
+
+\paragraph{Complexité totale.}
+\[
+T(n)=T_{\mathrm{fact}}+T_{\mathrm{desc}}+T_{\mathrm{rem}}
+=(4n-3)+(3n-2)+(3n-2)=\boxed{10n-7}.
+\]
+Détail par type d'opération :
+\begin{center}
+\begin{tabular}{lcccc}
+\toprule
+ & racines & divisions & multiplications & soustractions\\
+\midrule
+Factorisation & $n$ & $n-1$ & $n-1$ & $n-1$\\
+Descente & $0$ & $n$ & $n-1$ & $n-1$\\
+Remontée & $0$ & $n$ & $n-1$ & $n-1$\\
+\midrule
+\textbf{Total} & $n$ & $3n-1$ & $3n-3$ & $3n-3$\\
+\bottomrule
+\end{tabular}
+\end{center}
+(somme : $n+(3n-1)+2(3n-3)=10n-7$). La complexité algorithmique est donc \textbf{linéaire}, $T(n)=O(n)$
+(précisément $\Theta(n)$), contre $O(n^3)$ pour la méthode de Cholesky pleine.
+Si l'on doit résoudre plusieurs systèmes avec la même matrice $A$, la factorisation n'est faite qu'une fois
+et chaque nouveau second membre coûte $6n-4$ opérations.
+
+\subsection{Code Python et validation}
+
+Le système de test est $\mathrm{tridiag}(-1,2,-1)\,x=(1,0,\dots,0,1)^\T$, de solution exacte $x=(1,\dots,1)^\T$.
+
+\lstinputlisting[language=Python,caption={\texttt{ex1\_cholesky\_tridiag.py}}]{exercice1/ex1_cholesky_tridiag.py}
+
+\paragraph{Résultats obtenus.}
+\begin{center}
+\begin{tabular}{rccc}
+\toprule
+$n$ & $\|x-\mathbf 1\|_\infty$ & $\|Ax-b\|_\infty$ & $\|x-x_{\texttt{numpy}}\|_\infty$\\
+\midrule
+5   & $2{,}2\cdot10^{-16}$ & $4{,}4\cdot10^{-16}$ & $2{,}2\cdot10^{-16}$\\
+10  & $8{,}9\cdot10^{-16}$ & $4{,}4\cdot10^{-16}$ & $8{,}9\cdot10^{-16}$\\
+100 & $1{,}6\cdot10^{-14}$ & $4{,}4\cdot10^{-16}$ & $9{,}4\cdot10^{-15}$\\
+500 & $2{,}2\cdot10^{-13}$ & $4{,}4\cdot10^{-16}$ & $1{,}6\cdot10^{-13}$\\
+\bottomrule
+\end{tabular}
+\end{center}
+Le résidu reste de l'ordre de la précision machine ; l'erreur sur $x$ croît avec $n$ car
+$\mathrm{cond}(A)\sim n^2$. Les temps mesurés pour $n=10^5,\,2\cdot10^5,\,4\cdot10^5,\,8\cdot10^5$
+sont multipliés par $\approx 2$ à chaque doublement de $n$ (rapports $1{,}94$ ; $2{,}08$ ; $2{,}08$), ce qui confirme
+expérimentalement la complexité linéaire (\emph{les valeurs dépendent de la machine}).
+
+% =====================================================================
+\section{Exercice 2 : structures en langage C}
+% =====================================================================
+
+\subsection{Question 1 : structure \texttt{Vecteur}}
+Un vecteur de $\R^n$ est stocké par sa dimension et un tableau dynamique de $n$ réels :
+\begin{lstlisting}[language=C]
+typedef struct { int n; double *val; } Vecteur;
+\end{lstlisting}
+\texttt{alloc\_Vecteur(n)} alloue la structure puis le tableau (\texttt{calloc}, donc initialisé à $0$) et vérifie
+chaque allocation. \texttt{free\_Vecteur(x)} libère le tableau \emph{puis} la structure et renvoie \texttt{NULL},
+ce qui permet d'écrire \texttt{x = free\_Vecteur(x);} et d'éviter tout pointeur pendant.
+
+\subsection{Question 2 : structure \texttt{BiDiag}}
+Une matrice tridiagonale symétrique $A$ (ou bidiagonale inférieure $C$) n'a que $2n-1$ coefficients utiles.
+On ne stocke que la diagonale et la sous-diagonale ; pour $A$, la sur-diagonale est égale à la sous-diagonale par symétrie :
+\begin{lstlisting}[language=C]
+typedef struct {
+    int     n;       /* ordre de la matrice            */
+    double *diag;    /* M(i,i),   i = 0..n-1  (n)      */
+    double *sdiag;   /* M(i+1,i), i = 0..n-2  (n-1)    */
+} BiDiag;
+\end{lstlisting}
+Mémoire : $(2n-1)\times 8$ octets au lieu de $8n^2$.
+
+\subsection{Questions 3 et 4 : allocation et désallocation}
+\texttt{alloc\_BiDiag(n)} alloue la structure, \texttt{diag} (taille $n$) et \texttt{sdiag} (taille $n-1$, \texttt{NULL} si $n=1$),
+et libère proprement ce qui a déjà été alloué en cas d'échec. \texttt{free\_BiDiag(A)} libère
+\texttt{sdiag}, \texttt{diag}, puis la structure, et renvoie \texttt{NULL}.
+
+\lstinputlisting[language=C,caption={\texttt{ex2\_structures.c}}]{exercice2/ex2_structures.c}
+
+\noindent Compilation : \texttt{gcc -Wall -Wextra -o ex2 ex2\_structures.c}.
+
+% =====================================================================
+\section{Exercice 3 -- question 1 : solveur en un seul fichier}
+% =====================================================================
+
+Le programme \texttt{ex3\_solveur.c} regroupe en un seul fichier les structures de l'exercice~2 et le solveur de
+l'exercice~1 : \texttt{cholesky\_BiDiag} (algorithme~1), \texttt{descente} (algorithme~2), \texttt{remontee}
+(algorithme~3) et \texttt{solveur\_chol\_tridiag}. La dimension $n$ est passée en argument de la ligne de commande
+(\texttt{argv[1]}, convertie avec \texttt{strtol} et validée). Le programme construit le système de test, le résout,
+puis affiche $\|x-\mathbf 1\|_\infty$ et le résidu $\|Ax-b\|_\infty$.
+
+\lstinputlisting[language=C,caption={\texttt{ex3\_solveur.c}}]{exercice3/ex3_solveur.c}
+
+\noindent Compilation et exécution :
+\begin{lstlisting}[language=bash,numbers=none]
+gcc -Wall -Wextra -O2 -o ex3 ex3_solveur.c -lm
+./ex3 1000000
+\end{lstlisting}
+Pour $n=10^6$, on obtient un résidu $\|Ax-b\|_\infty\approx 6{,}7\cdot10^{-16}$ et une erreur
+$\|x-\mathbf 1\|_\infty\approx 9{,}8\cdot10^{-7}$ (conséquence de $\mathrm{cond}(A)\sim n^2$).
+
+\end{document}
