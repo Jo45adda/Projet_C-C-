@@ -1,0 +1,115 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage[margin=1.8cm]{geometry}
+\usepackage{enumitem}
+\setlist{nosep}
+\lstset{language=C,basicstyle=\ttfamily\footnotesize,frame=single,
+        breaklines=true,columns=fullflexible}
+
+\title{\vspace{-1.2cm}\textbf{TP : structures et tableaux 2D\\
+Méthodes directes -- matrices pleines}\\[2pt]
+\large M2-CS, MA0922 -- Calcul Scientifique (C/C++)}
+\author{ADDA Josaphat}
+\date{\today}
+
+\begin{document}
+\maketitle
+\vspace{-0.8cm}
+
+\section*{Exercice 1 : structures pour les matrices pleines}
+Un tableau 2D est stocké comme un tableau de $n$ pointeurs sur $n$ lignes
+de $m$ \texttt{double}. Les fonctions \texttt{alloc\_dtab\_2d} et
+\texttt{free\_dtab\_2d} allouent et libèrent ces blocs. La structure
+\texttt{Matrice} regroupe les dimensions et les données :
+\begin{lstlisting}
+typedef struct { int n; int m; double **tab; } Matrice;
+\end{lstlisting}
+\texttt{alloc\_Matrice} alloue la structure puis son tableau ;
+\texttt{free\_Matrice} libère le tableau puis la structure.
+\emph{Point d'attention} : dans la libération, \texttt{sizeof(tab)/sizeof(tab[0])}
+vaut $1$ (taille d'un pointeur, non du tableau alloué). Le nombre de lignes
+doit être transmis explicitement (\texttt{free\_dtab\_2d(tab, n)}), faute de quoi
+les lignes $1,\dots,n-1$ fuient.
+
+\section*{Exercice 2 : Cholesky sur matrice tridiagonale (stockage plein)}
+Les fonctions \texttt{set\_Matrice}, \texttt{get\_Matrice} et
+\texttt{disp\_Matrice} (indexation à partir de $0$) complètent la structure.
+On factorise $A=LL^T$ (variante « par colonnes » : colonne $k$ de $L$, puis mise à
+jour du bloc restant), puis on résout $Ly=b$ (descente) et $L^Tx=y$ (remontée).
+
+\textbf{Validation.} Pour $A=\mathrm{tridiag}(-1,2,-1)$, $n=8$ et $b=(1,\dots,1)^T$,
+la solution exacte est $x_i=\tfrac{i(n+1-i)}{2}$, soit
+$x=(4,7,9,10,10,9,7,4)^T$ ; le programme doit retrouver ces valeurs.
+Le coût est $\approx n^3/3$ opérations en stockage plein, alors que la structure
+tridiagonale permettrait un coût en $O(n)$ : le stockage plein ne l'exploite pas.
+
+\section*{Exercice 3 : Gauss sans permutation}
+\texttt{Solveur\_Gauss(Matrice *A, Vecteur *b, Vecteur *x)} met en œuvre
+l'élimination (test $|A_{kk}|<\varepsilon$, puis lignes $i>k$ mises à jour avec
+$c=A_{ik}/A_{kk}$) suivie de la remontée. Coût : $\approx\tfrac23 n^3$.
+
+\textbf{Preuve de correction.} La matrice du test
+($n+1$ sur la diagonale, $-1$ ailleurs) est à diagonale strictement dominante
+($n+1>n-1$), donc tous les pivots sont non nuls. La somme de chaque ligne vaut
+$(n+1)-(n-1)=2$, donc $x=(1,\dots,1)^T$ est solution exacte pour
+$b=(2,\dots,2)^T$. Le programme principal calcule donc l'erreur
+$\|x-\mathbf 1\|_\infty$ et/ou le résidu $\|Ax-b\|_\infty$ (calculé sur une copie de
+$A$, car le solveur modifie $A$ et $b$).
+
+\section*{Exercice 4 : produit matrice-vecteur, lignes vs colonnes}
+\textbf{Par lignes} : $b_i=\sum_j A_{ij}x_j$ (produits scalaires), boucle \texttt{i}
+externe, \texttt{j} interne.\\
+\textbf{Par colonnes} : $b=\sum_j x_j\,A_{:,j}$ (combinaison linéaire des colonnes),
+boucle \texttt{j} externe, \texttt{i} interne, avec \texttt{b[i] += A[i][j]*x[j]}.
+
+En C, le stockage est \emph{par lignes} : \texttt{A[i][j]} et \texttt{A[i][j+1]}
+sont contigus. La version par lignes parcourt la mémoire de façon contiguë
+(bonne utilisation du cache), la version par colonnes saute d'une ligne à l'autre
+(un défaut de cache potentiel par accès).
+
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+$n=m=3000$ & par lignes & par colonnes\\
+\midrule
+Temps (s) & \textbf{à compléter} & \textbf{à compléter}\\
+\bottomrule
+\end{tabular}
+\end{center}
+\textbf{Conclusion} : les deux versions font le même nombre de flops ($2nm$), mais
+la version par lignes doit être plus rapide en stockage par lignes. Le choix de la
+boucle interne est dicté par la disposition mémoire.
+
+\section*{Exercice 5 : Outer Product Update $A\leftarrow A+xy^T$}
+\textbf{Par lignes} : pour chaque $i$, $A_{i,:}\leftarrow A_{i,:}+x_i\,y^T$
+(\texttt{A[i][j] += x[i]*y[j]}, \texttt{j} interne).\\
+\textbf{Par colonnes} : pour chaque $j$, $A_{:,j}\leftarrow A_{:,j}+y_j\,x$
+(même formule, \texttt{i} interne).
+
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+$n=m=3000$ & par lignes & par colonnes\\
+\midrule
+Temps (s) & \textbf{à compléter} & \textbf{à compléter}\\
+\bottomrule
+\end{tabular}
+\end{center}
+\textbf{Conclusion} : même coût arithmétique ($2nm$), mais l'ordre des boucles
+détermine l'accès mémoire ; la version par lignes est attendue plus rapide pour
+un stockage par lignes (à confirmer avec les mesures ci-dessus).
+
+\section*{Exercice 6 : retour sur Gauss}
+Dans l'élimination, la mise à jour $A_{k+1:n,k+1:n}\leftarrow A_{k+1:n,k+1:n}-c\,A_{k,k+1:n}$
+est exactement un OPU (de rang 1). Notre implémentation boucle sur \texttt{i}
+(lignes) à l'extérieur et \texttt{j} (colonnes) à l'intérieur : c'est la version
+par lignes, adaptée au stockage C. Ce choix est donc \textbf{confirmé}. Une
+amélioration mineure est de ne mettre à jour que les colonnes $j>k$ (la colonne $k$
+est annulée par construction), ce qui évite un accès inutile.
+
+\end{document}

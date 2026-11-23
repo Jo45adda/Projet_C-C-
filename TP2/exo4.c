@@ -80,7 +80,7 @@ void matvec_colonne(Matrice *A, Vecteur *x, Vecteur *b) {
     // interpretation de la multiplication matrice-vecteur par colonne
     for (int j = 0; j < A->m; j++) {
         for (int i = 0; i < A->n; i++) {
-            b->tab[j] += A->tab[i][j] * x->tab[i];
+            b->tab[j] += A->tab[i][j] * x->tab[j];
         }
         
     }
